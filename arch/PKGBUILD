@@ -1,0 +1,64 @@
+# Maintainer: CharOfString <root@charofstring.cc>
+pkgbase=rofd-git
+pkgname=('rofd-git' 'librofd-ffi-git')
+pkgver=0.4.3
+pkgrel=1
+pkgdesc='OFD document reader and renderer'
+arch=('x86_64' 'aarch64')
+url="https://github.com/GXDE-OS/rofd"
+license=('LGPL-2.1-or-later')
+makedepends=('git' 'rust' 'pkgconf' 'cairo' 'freetype2' 'jbig2dec' 'qt6-base' 'qt6-declarative')
+# qttypes 通过 cpp_build 编译内嵌 C++，再由宏从目标文件读取元数据；启用 LTO 时目标文件只含
+# LTO 字节码，宏会报 "Struct metadata not present in target library file"
+# qttypes compiles inline C++ with cpp_build and its macros read metadata back
+# from the object file; with LTO the object only holds LTO bytecode and the
+# macros fail with "Struct metadata not present in target library file".
+options=('!lto')
+source=()
+sha512sums=()
+
+# 直接使用 PKGBUILD 所在的 git 仓库作为源码 ・ Build from the git checkout this PKGBUILD lives in.
+_srcroot() {
+  git -C "$startdir" rev-parse --show-toplevel
+}
+
+build() {
+  # 与 debian/rules 相同：只用仓库中 vendor/ 下的 crate 离线构建（见 .cargo/config.toml）。
+  # 必须在仓库根目录运行 cargo 才能读到该配置；CARGO_HOME 与输出目录放在 $srcdir，不写入源码树
+  # Same as debian/rules: build offline from the crates vendored under vendor/
+  # (see .cargo/config.toml).  cargo must run from the repository root to pick
+  # that configuration up; CARGO_HOME and the target directory stay in $srcdir
+  # so nothing is written into the source tree.
+  export CARGO_HOME="$srcdir/cargo-home"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  export CARGO_NET_OFFLINE=true
+  # qmetaobject 通过 qmake 定位 Qt ・ qmetaobject locates Qt through qmake.
+  export QMAKE=qmake6
+  cd "$(_srcroot)"
+  cargo build --release --offline --locked -p rofd-ffi -p rofd --features rofd/qt-reader
+}
+
+package_rofd-git() {
+  depends=("librofd-ffi-git=$pkgver-$pkgrel" 'qt6-base' 'qt6-declarative' 'cairo' 'freetype2' 'jbig2dec'
+           'hicolor-icon-theme' 'libgcc' 'glibc')
+  provides=('rofd')
+  conflicts=('rofd')
+
+  # 与 debian/rules 的 override_dh_auto_install 相同 ・ Same as override_dh_auto_install in debian/rules.
+  install -Dm755 "$srcdir/target/release/rofd" "$pkgdir/usr/bin/rofd"
+  install -Dm644 "$(_srcroot)/debian/rofd.desktop" "$pkgdir/usr/share/applications/rofd.desktop"
+  install -Dm644 "$(_srcroot)/resources/logo.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/rofd.png"
+}
+
+package_librofd-ffi-git() {
+  pkgdesc='Stable C ABI for the rofd OFD reader and renderer'
+  depends=('cairo' 'freetype2' 'jbig2dec' 'libgcc' 'glibc')
+  # Debian 把头文件拆到 -dev 包，这里按 Arch 惯例合并 ・ Debian splits the header into -dev; merged here as usual on Arch.
+  provides=('librofd-ffi')
+  conflicts=('librofd-ffi')
+
+  install -Dm644 "$srcdir/target/release/librofd_ffi.so" "$pkgdir/usr/lib/librofd_ffi.so.0.4.0"
+  ln -s librofd_ffi.so.0.4.0 "$pkgdir/usr/lib/librofd_ffi.so.0"
+  ln -s librofd_ffi.so.0.4.0 "$pkgdir/usr/lib/librofd_ffi.so"
+  install -Dm644 "$(_srcroot)/crates/rofd-ffi/include/rofd.h" "$pkgdir/usr/include/rofd.h"
+}
