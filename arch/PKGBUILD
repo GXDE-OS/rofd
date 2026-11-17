@@ -1,6 +1,6 @@
 # Maintainer: CharOfString <root@charofstring.cc>
-pkgbase=rofd-git
-pkgname=('rofd-git' 'librofd-ffi-git')
+pkgbase=rofd
+pkgname=('rofd' 'librofd-ffi')
 pkgver=0.4.3
 pkgrel=1
 pkgdesc='OFD document reader and renderer'
@@ -38,11 +38,12 @@ build() {
   cargo build --release --offline --locked -p rofd-ffi -p rofd --features rofd/qt-reader
 }
 
-package_rofd-git() {
-  depends=("librofd-ffi-git=$pkgver-$pkgrel" 'qt6-base' 'qt6-declarative' 'cairo' 'freetype2' 'jbig2dec'
+package_rofd() {
+  depends=("librofd-ffi=$pkgver-$pkgrel" 'qt6-base' 'qt6-declarative' 'cairo' 'freetype2' 'jbig2dec'
            'hicolor-icon-theme' 'libgcc' 'glibc')
-  provides=('rofd')
-  conflicts=('rofd')
+  provides=("rofd-git=$pkgver")
+  conflicts=('rofd-git')
+  replaces=('rofd-git')
 
   # 与 debian/rules 的 override_dh_auto_install 相同 ・ Same as override_dh_auto_install in debian/rules.
   install -Dm755 "$srcdir/target/release/rofd" "$pkgdir/usr/bin/rofd"
@@ -50,12 +51,13 @@ package_rofd-git() {
   install -Dm644 "$(_srcroot)/resources/logo.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/rofd.png"
 }
 
-package_librofd-ffi-git() {
+package_librofd-ffi() {
   pkgdesc='Stable C ABI for the rofd OFD reader and renderer'
   depends=('cairo' 'freetype2' 'jbig2dec' 'libgcc' 'glibc')
   # Debian 把头文件拆到 -dev 包，这里按 Arch 惯例合并 ・ Debian splits the header into -dev; merged here as usual on Arch.
-  provides=('librofd-ffi')
-  conflicts=('librofd-ffi')
+  provides=("librofd-ffi-git=$pkgver")
+  conflicts=('librofd-ffi-git')
+  replaces=('librofd-ffi-git')
 
   install -Dm644 "$srcdir/target/release/librofd_ffi.so" "$pkgdir/usr/lib/librofd_ffi.so.0.4.0"
   ln -s librofd_ffi.so.0.4.0 "$pkgdir/usr/lib/librofd_ffi.so.0"
